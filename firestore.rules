@@ -1,0 +1,222 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Hardened Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // --- Schema Validation Helpers ---
+    function isValidUserAccount(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 160)) &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500));
+    }
+
+    function isValidCreatorProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('bio' in data) || data.bio == null || (data.bio is string && data.bio.size() <= 240));
+    }
+
+    function isValidCommunityTemplate(data) {
+      return data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+             (!('authorPhotoUrl' in data) || data.authorPhotoUrl == null || (data.authorPhotoUrl is string && data.authorPhotoUrl.size() <= 500)) &&
+             data.title is string && data.title.size() >= 2 && data.title.size() <= 80 &&
+             data.description is string && data.description.size() <= 280 &&
+             data.category is string && data.category in ['Ícone', 'Logo', 'Layout', 'Ilustração', 'Social', 'UI'] &&
+             data.dimensionsLabel is string && data.dimensionsLabel.size() >= 1 && data.dimensionsLabel.size() <= 40 &&
+             data.previewAccentHex is string && data.previewAccentHex.size() >= 4 && data.previewAccentHex.size() <= 9 &&
+             data.novaJson is string && data.novaJson.size() >= 2 && data.novaJson.size() <= 750000 &&
+             data.isPublic is bool &&
+             data.likesCount is int && data.likesCount >= 0;
+    }
+
+    function isValidCloudProject(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.artboardSummary is string && data.artboardSummary.size() >= 1 && data.artboardSummary.size() <= 80 &&
+             data.objectCount is int && data.objectCount >= 0 && data.objectCount <= 100000 &&
+             data.novaJson is string && data.novaJson.size() >= 2 && data.novaJson.size() <= 750000;
+    }
+
+    // --- /users/{userId} (Private Account PII - Owner Only) ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserAccount(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserAccount(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      // --- /users/{userId}/cloud_projects/{projectId} (Owner Only) ---
+      match /cloud_projects/{projectId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(projectId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(projectId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'name', 'artboardSummary', 'objectCount', 'novaJson', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'artboardSummary', 'objectCount', 'novaJson', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidCloudProject(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(userId) &&
+                         isValidId(projectId) &&
+                         request.auth.uid == userId &&
+                         isValidCloudProject(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'artboardSummary', 'objectCount', 'novaJson', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(projectId) && request.auth.uid == userId;
+      }
+    }
+
+    // --- /creators/{userId} (Public Creator Profile - No PII) ---
+    match /creators/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'photoUrl', 'bio', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidCreatorProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidCreatorProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'bio', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // --- /community_templates/{templateId} ---
+    match /community_templates/{templateId} {
+      allow get: if isSignedIn() && isValidId(templateId) && (existing().isPublic == true || existing().authorId == request.auth.uid);
+      allow list: if isSignedIn() && (existing().isPublic == true || existing().authorId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(templateId) &&
+                       incoming().authorId == request.auth.uid &&
+                       incoming().likesCount == 0 &&
+                       incoming().keys().hasAll(['authorId', 'authorName', 'title', 'description', 'category', 'dimensionsLabel', 'previewAccentHex', 'novaJson', 'isPublic', 'likesCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['authorId', 'authorName', 'authorPhotoUrl', 'title', 'description', 'category', 'dimensionsLabel', 'previewAccentHex', 'novaJson', 'isPublic', 'likesCount', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidCommunityTemplate(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(templateId) &&
+                       isValidCommunityTemplate(incoming()) &&
+                       incoming().authorId == existing().authorId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time && (
+                         // Action 1: Author updates template metadata or content
+                         (
+                           existing().authorId == request.auth.uid &&
+                           incoming().likesCount == existing().likesCount &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['authorName', 'authorPhotoUrl', 'title', 'description', 'category', 'dimensionsLabel', 'previewAccentHex', 'novaJson', 'isPublic', 'updatedAt'])
+                         ) ||
+                         // Action 2: Authenticated user likes a public template atomically with likes/{uid} creation
+                         (
+                           existing().isPublic == true &&
+                           incoming().likesCount == existing().likesCount + 1 &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt']) &&
+                           existsAfter(/databases/$(database)/documents/community_templates/$(templateId)/likes/$(request.auth.uid))
+                         ) ||
+                         // Action 3: Authenticated user unlikes a public template atomically with likes/{uid} deletion
+                         (
+                           existing().isPublic == true &&
+                           existing().likesCount >= 1 &&
+                           incoming().likesCount == existing().likesCount - 1 &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt']) &&
+                           !existsAfter(/databases/$(database)/documents/community_templates/$(templateId)/likes/$(request.auth.uid))
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(templateId) && existing().authorId == request.auth.uid;
+
+      // --- /community_templates/{templateId}/likes/{userId} ---
+      match /likes/{userId} {
+        allow get: if isSignedIn() && isValidId(templateId) && isValidId(userId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+        allow create: if isSignedIn() &&
+                         isValidId(templateId) &&
+                         isValidId(userId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'createdAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         exists(/databases/$(database)/documents/community_templates/$(templateId)) &&
+                         get(/databases/$(database)/documents/community_templates/$(templateId)).data.isPublic == true &&
+                         getAfter(/databases/$(database)/documents/community_templates/$(templateId)).data.likesCount == get(/databases/$(database)/documents/community_templates/$(templateId)).data.likesCount + 1;
+
+        allow update: if false;
+
+        allow delete: if isSignedIn() &&
+                         isValidId(templateId) &&
+                         isValidId(userId) &&
+                         request.auth.uid == userId &&
+                         exists(/databases/$(database)/documents/community_templates/$(templateId)) &&
+                         getAfter(/databases/$(database)/documents/community_templates/$(templateId)).data.likesCount == get(/databases/$(database)/documents/community_templates/$(templateId)).data.likesCount - 1;
+      }
+    }
+  }
+}

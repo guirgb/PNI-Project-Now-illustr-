@@ -1,0 +1,6 @@
+{
+  "name": "NOVA",
+  "description": "Editor vetorial profissional para Android com interface de desktop, pranchetas, camadas, desenho vetorial e exportacao SVG e PNG.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

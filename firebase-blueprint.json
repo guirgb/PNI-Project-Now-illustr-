@@ -1,0 +1,225 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private user account profile containing PII, readable and writable only by the owner.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name shown in the user account menu."
+        },
+        "email": {
+          "type": "string",
+          "description": "Google account email address (optional)."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Google profile avatar URL (optional)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp written with FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp written with FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "displayName", "createdAt", "updatedAt"]
+    },
+    "CreatorProfile": {
+      "title": "CreatorProfile",
+      "description": "Public creator profile without PII for attribution in the community gallery.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the creator."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Public display name."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Public avatar URL (optional)."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short creator biography (optional)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp written with FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update timestamp written with FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "displayName", "createdAt", "updatedAt"]
+    },
+    "CommunityTemplate": {
+      "title": "CommunityTemplate",
+      "description": "Editable vector template published to the NOVA community gallery.",
+      "type": "object",
+      "properties": {
+        "authorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the template author."
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Public author display name."
+        },
+        "authorPhotoUrl": {
+          "type": "string",
+          "description": "Optional public author avatar URL."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the published design."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of the template."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Ícone", "Logo", "Layout", "Ilustração", "Social", "UI"],
+          "description": "Community template category."
+        },
+        "dimensionsLabel": {
+          "type": "string",
+          "description": "Artboard dimensions label such as 1080 x 1080 px."
+        },
+        "previewAccentHex": {
+          "type": "string",
+          "description": "Hex color representing the design accent."
+        },
+        "novaJson": {
+          "type": "string",
+          "description": "Serialized .nova vector document JSON."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the template is visible in the public community feed."
+        },
+        "likesCount": {
+          "type": "integer",
+          "description": "Number of likes maintained atomically alongside the likes subcollection."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp written with FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update timestamp written with FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "authorId",
+        "authorName",
+        "title",
+        "description",
+        "category",
+        "dimensionsLabel",
+        "previewAccentHex",
+        "novaJson",
+        "isPublic",
+        "likesCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TemplateLike": {
+      "title": "TemplateLike",
+      "description": "Per-user like marker doc under a community template.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who liked the template."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp written with FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "CloudProject": {
+      "title": "CloudProject",
+      "description": "User-owned vector project synced to the cloud.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the project owner."
+        },
+        "name": {
+          "type": "string",
+          "description": "Project document name."
+        },
+        "artboardSummary": {
+          "type": "string",
+          "description": "Summary of artboard dimensions and count."
+        },
+        "objectCount": {
+          "type": "integer",
+          "description": "Total number of vector objects in the document."
+        },
+        "novaJson": {
+          "type": "string",
+          "description": "Serialized .nova project JSON."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp written with FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update timestamp written with FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "name", "artboardSummary", "objectCount", "novaJson", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Private user account records containing email PII."
+    },
+    "/creators/{userId}": {
+      "schema": { "$ref": "#/entities/CreatorProfile" },
+      "description": "Public creator profiles without PII."
+    },
+    "/community_templates/{templateId}": {
+      "schema": { "$ref": "#/entities/CommunityTemplate" },
+      "description": "Publicly shared NOVA community vector templates."
+    },
+    "/community_templates/{templateId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/TemplateLike" },
+      "description": "Per-user likes subcollection synchronized atomically with likesCount."
+    },
+    "/users/{userId}/cloud_projects/{projectId}": {
+      "schema": { "$ref": "#/entities/CloudProject" },
+      "description": "Owner-only personal cloud-synced NOVA projects."
+    }
+  }
+}
